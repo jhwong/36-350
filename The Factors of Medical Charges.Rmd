@@ -1,0 +1,178 @@
+---
+title: "R Replication Code"
+output: html_document
+---
+
+```{r}
+medical <- read.csv("~/Desktop/Econ Data Science/insurance.csv")
+
+
+nrow(medical)
+```
+
+**Fitting the Full Model**
+```{r}
+fitmodel <- lm(charges ~ children + bmi + age + sex + smoker + region, data = medical)
+summary(fitmodel)
+plot(fitmodel)
+library(stargazer)
+
+stargazer(fitmodel, type = "text")
+```
+
+**Exploratory Data Analysis**
+
+```{r}
+
+
+attach(medical)
+plot(bmi, charges, main = "Distribution of Charges by BMI", ylab = "Charges", xlab = "BMI")
+
+plot(smoker, charges, main = "Medical Charges by Smoker Status", ylab = "Charge", xlab = "SmokerStatus")
+```
+
+
+
+**Fitting models to determine the most superior one**
+```{r}
+fitmodel2 <- lm(charges ~ children + bmi + age + sex + smoker + region, data = medical)
+fitmodel3 <- lm(charges ~ children + bmi + age + smoker + region, data = medical)
+anova(fitmodel3, fitmodel2)
+
+#reduced model more significant
+```
+
+**Reduced Model:**
+
+```{r}
+
+fitmodel4 <- lm(charges ~ children + bmi + age + smoker, data = medical)
+summary(fitmodel4)
+plot(fitmodel4)
+stargazer(fitmodel4, type = "text")
+
+```
+
+**Predictions**
+```{r}
+obs00 <- data.frame(children = 0, bmi = 25, age = 22, smoker = "no")
+prediction2 <- predict(fitmodel4, obs00, type = "response")
+prediction2
+
+
+obs01 <- data.frame(children = 2, bmi = 32, age = 38, smoker = "yes")
+prediction3 <- predict(fitmodel4, obs01, type = "response")
+prediction3
+```
+
+
+**Diagnostics of Reduced and Full Models**
+```{r}
+
+plot(fitted(fitmodel4), resid(fitmodel4), main = "Residuals vs. Fitted", xlab = "Fitted", ylab = "Residuals")
+
+plot(fitted(fitmodel2), resid(fitmodel2), main = "Residuals vs. Fitted", xlab = "Fitted", ylab = "Residuals")
+
+
+resfit <- data.frame(fitted(fitmodel4), resid(fitmodel4), medical$smoker)
+resfit2 <- data.frame(fitted(fitmodel2), resid(fitmodel2), medical$smoker)
+
+library(ggplot2)
+
+ggplot(resfit, aes(x = fitted.fitmodel4. , y = resid.fitmodel4., color = medical.smoker)) + geom_point(size = 2) + geom_hline(yintercept = 0) + xlab("Fitted") + ylab("Residuals") + ggtitle("Residuals vs Fitted by Smoker Status Reduced Model")
+
+ggplot(resfit2, aes(x = fitted.fitmodel2. , y = resid.fitmodel2., color = medical.smoker)) + geom_point(size = 2) + geom_hline(yintercept = 0) + xlab("Fitted") + ylab("Residuals") + ggtitle("Residuals vs Fitted by Smoker Status Full Model")
+
+qqnorm(resid(fitmodel4), main = "Reduced Model")
+qqline(resid(fitmodel4))
+
+qqnorm(resid(fitmodel2), main = "Full Model")
+qqline(resid(fitmodel2))
+```
+
+
+**Fitting and Analyzing an Interaction Model**
+```{r}
+fitmodel5 <- lm(charges ~ children + bmi + age + smoker + sex*smoker, data = medical)
+summary(fitmodel5)
+plot(fitmodel5)
+stargazer(fitmodel5, type = "text")
+anova(fitmodel4, fitmodel5)
+#Reduced model still superior
+```
+
+
+**Cross-Fold Analysis**
+```{r}
+
+variab0 = rep(1:7,length(medical)/7)
+fold = sample(variab0)
+emptymatrix00 = matrix(NA, nrow = 3, ncol=7)
+
+for (i in 1:7) {
+    train.x <- medical[(fold == i),]
+    test.x <- medical[!(fold == i),]
+
+fitmodel <- lm(charges ~ children + bmi + age + sex + smoker + region, data = train.x)
+fitmodel4 <- lm(charges ~ children + bmi + age + smoker, data = train.x)
+fitmodel5 <- lm(charges ~ children + bmi + age + smoker + sex*smoker, data = train.x)
+
+
+    emptymatrix00[1,i] = mean((test.x$charges - predict(fitmodel, newdata = test.x))^2)
+    emptymatrix00[2,i] = mean((test.x$charges - predict(fitmodel4, newdata = test.x))^2)
+    emptymatrix00[3,i] = mean((test.x$charges - predict(fitmodel5, newdata = test.x))^2)
+  }
+
+emptymatrix00
+
+fullmodel <- mean(emptymatrix00[1,])
+reducedmodel  <- mean(emptymatrix00[2,])
+interactionmodel <- mean(emptymatrix00[3,])
+
+fullmodel
+reducedmodel
+interactionmodel
+
+
+se.full <- sd(emptymatrix00[1,])/(sqrt(5))
+se.reduced <- sd(emptymatrix00[2,])/(sqrt(5))
+se.interaction <- sd(emptymatrix00[3,])/(sqrt(5))
+
+
+se.full
+se.reduced
+se.interaction
+```
+
+**Visualizations**
+```{r}
+library(broom)
+library(tidyverse)
+
+medical$children.z <- scale(medical$children)
+medical$bmi.z <- scale(medical$bmi)
+medical$age.z <- scale(medical$age)
+FullRegression.z <- lm(charges ~ children.z + bmi.z + age.z + sex + smoker + region, data = medical)
+FullRegression.z.tidy <- tidy(FullRegression.z, conf.int = TRUE)
+library(ggthemes)
+ggplot(FullRegression.z.tidy[c(2,3,5,6,7,8,9),], aes(estimate, term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = .2, alpha= .3) +
+  geom_vline(xintercept = 0) + labs(x = "changes in charges")
+
+ReducedRegression.z <- lm(charges ~ children.z + bmi.z + age.z + smoker, data = medical)
+ReducedRegression.z.tidy <- tidy(ReducedRegression.z, conf.int = TRUE)
+ggplot(ReducedRegression.z.tidy[c(2,3,5),], aes(estimate, term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = .2, alpha= .3) +
+  geom_vline(xintercept = 0) + labs(x = "changes in charges")
+
+InteractionRegression.z <- lm(charges ~ children.z + bmi.z + age.z + smoker + sex + sex * smoker, data = medical)
+InteractionRegression.z.tidy <- tidy(InteractionRegression.z, conf.int = TRUE)
+ggplot(InteractionRegression.z.tidy[c(2,3,5,6,7),], aes(estimate, term)) +
+  geom_point() +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = .2, alpha= .3) +
+  geom_vline(xintercept = 0) + labs(x = "changes in charges")
+
+
+```

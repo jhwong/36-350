@@ -3,6 +3,7 @@ title: "R Replication Code"
 output: html_document
 ---
 
+**The insurance.csv file may be found in the repository**
 ```{r}
 medical <- read.csv("~/Desktop/Econ Data Science/insurance.csv")
 

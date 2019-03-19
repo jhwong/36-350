@@ -1,1 +1,0 @@
-cat("Humans are very hard to satisfy. Once they get a hold of something good, they just want more and more. Good grades in school are no exception. Some students are so crazy that they hurt themselves by taking too many classes at Carnegie Mellon!")

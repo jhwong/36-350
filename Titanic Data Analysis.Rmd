@@ -1,0 +1,505 @@
+---
+title: "Stat 315, Assignment 03"
+author: Jordan Wong
+date: "Due Wednesday, May 31th, 2017 (11:59pm)"
+output: 
+  html_document:
+    toc:  true  
+    toc_float:  true 
+    code_folding:  show
+---
+
+***General instructions for all assignments***: 
+
+
+***
+***
+
+***Purpose of Today's Assignment***
+
+
+
+
+
+# Oral Evaluation Graphic
+
+
+
+
+
+
+
+
+# Lab 
+
+## Lab Problem 1
+
+**Chi-Square Tests in R**:  
+
+Bar charts are usually easier to read than spine charts, pie charts, and rose diagrams.  There are several ways we can add even more useful information to bar charts.
+
+In this assignment, we'll be using data about Titanic Passangers. We will be using a subset of the data from kaggle that can be found:  [https://raw.githubusercontent.com/benjaminleroy/stat315summer_data/master/assignments/assignment03/titanic.csv]
+
+Additional information about the Titanic data on Kaggle can be found [here](https://www.kaggle.com/c/titanic/data).  
+
+Read the dataset in from GitHub (code provided) and then complete the following questions.
+
+You'll need to install and load the `forcats` package to your computer, we will discuss what this package does in Homework.
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+library(reshape2)
+library(forcats)
+
+
+
+titanic <- read_csv("https://raw.githubusercontent.com/benjaminleroy/stat315summer_data/master/assignments/assignment03/titanic.csv")
+
+
+titanic <- mutate(titanic,
+                 Age_category = cut(Age,breaks = c(0,12,18,25,60,100)),
+                 Age_category = fct_recode(Age_category,
+                                           "Elderly" = "(60,100]",
+                                           "Adults" = "(25,60]",
+                                           "Children and Infants" = "(0,12]",
+                                           "Teenagers" = "(12,18]",
+                                           "Young Adults" ="(18,25]" 
+                                              ),
+                 Size_of_family = SibSp + Parch + 1, #include themselves
+                 Survived = ifelse(Survived == 0,"No","Yes"),
+                 mwc = factor( 
+                   1*(Age_category %in% c("Children and Infants",
+                                          "Teenagers")*(1 + 1*(Sex == "male"))), 
+                   levels = 0:2,labels = c("Children","Woman","Men"))
+                )
+
+```
+
+
+
+
+**a**
+Socio-economic status is coded under Pclass, with 1 representing 1st class, 2 representing 2nd class, and 3 representing 3rd class. SibSp represents how many siblings (including stepbrothers and stepsisters) and spouses (excluding mistresses and ex-wives) each passenger had on the titanic. This is different to parch which represents how many parents (including stepparents) and children (including stepchildren) each passenger had on board the titanic. 
+
+**b**
+
+```{r, warning = FALSE, message = FALSE}
+
+survived_marginal <- titanic %>%
+  group_by(Survived) %>%
+  summarize(count = n(), 
+            total = nrow(titanic),  # why do you think we need this in here?
+            #Having the total here allows us to enhance our understanding of the proportion and percentage of people who survived and people who did not survive. Also, total is needed to calculate proportion below.
+            proportion = round(count / total, 4),
+            percentage = proportion * 100)
+
+
+survived_marginal
+```
+
+**c**
+
+```{r, fig.height = 5, fig.width = 10}
+library(gridExtra)
+library(ggplot2)
+survived_plot <- ggplot(survived_marginal, aes(x = Survived, y = percentage)) + 
+  geom_bar(stat = "identity")
+
+pclass_marginal <- titanic %>%
+   group_by(Pclass) %>%
+   summarize(count = n(), 
+             total = nrow(titanic),
+proportion = round(count/total, 4), percentage = proportion * 100)
+
+pclass_plot <- ggplot(pclass_marginal, aes(x = Pclass, y = percentage)) + geom_bar(stat = "identity")+xlab("class")
+
+grid.arrange(survived_plot, pclass_plot, ncol = 2)
+```
+
+
+
+**d**
+I do not think my friend is right, becase the Pclass bar chart is showing that there were a lot more passengers in the 3rd class than the other two classes.
+
+
+
+**e**
+```{r}
+chisq.test(pclass_marginal$count)
+```
+This function outputs the X-squard value, the degrees of freedom, and the p-value for the data. The p-value is 2.2e-16, which means that we can reject the null hypothesis that the proportions in each class is the same. Therefore, we have sufficient evidence to conclude that the distribution of class on the titanic was not equal.
+
+**f**
+
+```{r}
+chisq.test(pclass_marginal$count, p = c(0.225, 0.225,.55))
+```
+Since the p-value of the test is 0.2783, we have sufficient evidence to prove that the proportions are the same as the proposed proportions. My friend's revised guess is right. 
+
+
+
+**g**
+In a chi-square test, we are examining observed and expected counts of each category. Therefore, count is used here instead or proportion or percentage. 
+
+***
+***
+
+
+
+## Lab Problem 2
+
+**2-D Bar Charts and (Empirical) Conditional Distributions**
+
+**a**
+
+```{r}
+ggplot(titanic, aes(x = Pclass, fill = Survived)) + geom_bar()
+```
+
+
+
+**b**
+```{r}
+mwcandpclass_joint <- select(titanic,mwc,Pclass)
+
+mwcandpclass_joint %>%
+ group_by(mwc,Pclass) %>%
+ summarize(count = n()) %>%
+ spread(Pclass,count)
+```
+The woman and children first policy does not explain the classism seen above. Although women and children consist of 491 of the 3rd class, most of the 3rd class did not survive. The 1st and 2nd class had at least half of their passengers survive but had a lower proportion of women and children than the 3rd class.
+
+**c**
+
+```{r}
+ggplot(titanic, aes(x = Age_category, fill = Sex)) + geom_bar()
+```
+
+
+
+**d**
+The graph in c diplays age categories on the x-axis, counts on the y-axis, and sex categories using color. It is interesting to see that as the age categories go older, the sex ratio becomes more skewed towards men, although it usually becomes skewed towards women in real life. 
+
+***
+***
+
+## Lab Problem 3
+
+**Adjusting Legends**
+
+
+
+**a**
+```{r}
+ggplot(titanic, aes(x = Age_category, fill = Sex)) + geom_bar() + labs(fill = "Gender")
+```
+This function labels the legend "Gender", which replaces the name for 'Sex', which was "Sex" by default.
+
+**b**
+```{r}
+j <- ggplot(titanic, aes(x = Age_category, fill = Sex)) + geom_bar() + labs(fill = "Gender")
+
+
+j + theme(legend.position = "bottom")
+```
+
+***
+***
+
+## Lab Problem 4
+
+**More on Pie Charts and Rose Diagrams**
+
+**a**  
+```{r}
+library(tidyverse)
+ 
+
+
+human_resources <- read_csv("https://raw.githubusercontent.com/benjaminleroy/stat315summer_data/master/assignments/assignment02/HR_comma_sep.csv")
+
+
+
+human_resources <- mutate(human_resources,
+overworked = ifelse(average_monthly_hours >= 195,"overworked","not overworked"),sales = ifelse(department == "sales","yes","no"))
+
+
+hr_department_plot <- ggplot(data = human_resources, aes(x=department))
+
+sc <- hr_department_plot + geom_bar(aes(x = factor(1), fill = department), width = 1) + coord_cartesian() + labs(title = "Distribution of Employees to each Department")+xlab("Distribution")+ylab("")
+
+#the hole disappears if I add "width = 1" inside geom_bar
+
+pie <- sc + coord_polar("y", start = 0)
+
+pie
+
+
+```
+
+
+**b**
+
+```{r}
+stacked_rose <- ggplot(human_resources, aes(x = department, fill = overworked)) + geom_bar() + labs(fill = "overworked", title = "Employees' Departments and Overworking Status") + coord_polar() + xlab("Department") + ylab("Number of Employees")
+
+stacked_bar <- ggplot(human_resources, aes(x = department, fill = overworked)) + geom_bar() + labs(fill = "overworked", title = "Employees' Departments and Overworking Status") + xlab("Department") + ylab("Number of Employees")
+
+grid.arrange(stacked_rose, stacked_bar, ncol = 2)
+```
+
+
+
+
+
+**c**
+The stacked rose diagram displays department on the x-axis and number of employees on the y-axis. The fill variable is 'overworked'. The main takeaway of the graph is that employees are more likely to be distributed into sales but departments su ch as IT and management have largely overworked workers. Although there is minimal distortion and unnecessary data-ink, the stacked rose diagram is not optimal when comparing between two categories or when attempting to determine the count for one of the categories. The marginal distribution of 'department' on this chart is given by the entire shape that corresponds to each x-axis category. To find the conditional distribution of 'overworked', you look at the IT's position on the circle, examine the shape, and the conditional distribution would just be the blue part of it divided by the entire shape. The stacked rose diagram is an absolutely terrible graph because if there are a lot of categories for the x-axis variable, if may be hard to tell which shape corresponds with which category. Another reason is that the shading in the shapes may be misleading. The proportion of a shape that is shaded in by a certain color may be mistaken because the viewer might be drawn to the area of the color, which would completely mislead the viewer.
+
+
+
+***
+***
+
+# Homework
+## Homework Problem 0
+
+**Tabbed HTML Output**
+
+***
+***
+
+## Homework Problem 1
+
+**`R` Style Guides:  Google vs. Hadley**:  
+
+
+**a**
+One difference would be naming functions and variables. Google's R style guide says you can either use a period or use capitalization, for example, variable.name or variableName. Meanwhile, Hadley Wickham's Advanced Style requires lower-case and an underscore: variable_name. Another difference is that Google's style does not require that there be a difference in naming variable and function names, while Wickham's style recommends variables to be nouns and functions to be verbs. Another difference is indentation: while both recommend using two spaces, there is an exception for Wickham's style and no exception with Google's. For Wickham's style, it is recommended to indent the second line of the function to where the definition started. Regarding spacing, there is also a small difference. Google's style requires spacing around :, ::, or :::, while Wickham's style requires there to not be spaces between them. Moreover, there is a discrepency when using curly braces for the two styles. Google's style does not allow short statements to be on the same line (it requires that the body of the block be on a new line), whereas Wickham's style does allow short statements to be in one line.
+
+**b**
+I will be adhering to Wickham's style for this homework.
+
+
+
+**For this homework, all Homework problems must follow these the guidelines specified in Homework Problem 1 part b.**
+
+***
+***
+
+## Homework Problem 2 
+
+
+
+
+***
+***
+
+## Homework Problem 3
+
+(3 points each)
+
+**Data Manipulation and The Many Ways To Create 1-D and 2-D Bar Charts**
+
+
+
+**a**
+Four new columns were created, Age_category, Size_of_family, Survived, and mwc. The function 'mutate' was used to add the additional columns to the existing data drame. The function is in the 'forcats' package. The author of the 'forcats' package is Hadley Wickham. Cut is a function that divides the range of the x-axis into intervals and codes the x values according to their respective intervals. The intervals can be referred to as levels, with the first interval being level one and so on. 
+
+```{r}
+titanic <- mutate(titanic,
+  low_price_ticket = cut(Fare, breaks = c(0,    12, 1000), right = FALSE),
+  low_price_ticket =        fct_recode(low_price_ticket, "Less than 12 Dollars"= "[0, 12)", "12 Dollars Or Longer" = "[12, 1e+03)")
+   )
+
+titanic <- mutate(titanic, 
+   Sibblings_or_Spouse = cut(SibSp, breaks =     c(0, 1, 100), right = FALSE),
+   Sibblings_or_Spouse =          
+   fct_recode(Sibblings_or_Spouse, "No" = "[0,    1)","Yes" = "[1, 100)")
+)
+```
+
+
+**b**
+
+```{r}
+ggplot(titanic, aes(x = Size_of_family)) + geom_bar() + labs(title = "Passengers' Family Sizes Aboard Titanic") + xlab("Family Size") + ylab("Number of Passengers")
+```
+
+**c**
+
+```{r}
+Size_of_family_marginal <- titanic %>%
+group_by(Size_of_family) %>%
+summarize(count = n(),
+total = nrow(titanic),
+proportion = round(count/total, 4),   percentage = proportion * 100)
+
+Size_of_family_plot <- ggplot(Size_of_family_marginal, aes(x =  Size_of_family, y = percentage)) + geom_bar(stat = "identity") + xlab("Size of Family")
+
+Size_of_family_plot
+```
+
+**d**
+
+```{r}
+Age_category_stacked_bar <- ggplot(titanic, aes(x = Age_category, fill = Survived)) + geom_bar() + labs(title = "Surviving Passengers by Age Category") + xlab("Age Category") + ylab("Number of Passengers")
+
+Age_category_stacked_bar
+```
+
+**e**
+
+```{r, warning = FALSE, message = FALSE}
+library(tidyverse)
+  death_by_age <- titanic %>%
+  group_by(Age_category, Survived) %>%
+  summarize(count = n())
+
+ggplot(death_by_age, aes(x = Age_category, y = count, fill = Survived)) +
+  geom_bar(stat = "identity") + labs(title = "Surviving Passengers by Age Category") + xlab("Age Category") + ylab("Number of Passengers")
+```
+
+
+
+
+**e**
+Since we had to specify y = count here, we must use 'stat = identity' so that this is true for all of the categories on the x-axis. The geom_bar() in part d has nothing in it by default because the y-axis aesthetic is automatically assigned to the '..count..' object. 
+
+**f**
+
+```{r, warning = FALSE, message = FALSE}
+death_by_age <- titanic %>%
+  group_by(Age_category, Survived)%>% 
+  summarize(count = n())
+ 
+ 
+
+ggplot(titanic, aes(x = Age_category, fill = Survived)) + geom_bar(position = "dodge")
+ 
+
+```
+
+
+**g**
+
+```{r}
+ggplot(titanic, aes(x = Age_category, fill = Survived)) + geom_bar(position = "fill") + ylab("Proportion")
+```
+
+
+
+**h**
+I am trying to alter graph in (g).
+
+```{r}
+original_plot <- ggplot(titanic, aes(x = Age_category, fill = Survived)) + geom_bar(position = "fill") + ylab("Proportion")
+
+original_plot + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+**i**
+I am trying to alter the graph in (g). 
+```{r}
+ggplot(titanic, aes(x = Age_category, fill = Survived)) + geom_bar(position = "fill") + ylab("Proportion") + coord_flip()
+```
+
+
+
+**j**
+The graph in (e) allows the viewer to see the marginal distribution of Age Category more easily. This is not easily seen in the other two graphs. The graph in (f) allows the view to see joint distributions between Survived and Age_Category more easily. This is not easily seen in the other two graphs. The graph in (g) allows the viewer to see conditional distributions of Survived given Age_Category more easily. This is not easily seen in the other two graphs. 
+
+The advantage of a stacked bar chart is that it is easy to see the marginal distribution of the x-axis variable. The advantage of the side-by-side bar chart is that it is easy to see the joint distributions between the two variables. The advantage of a proportional bar chart is that it is easy to examine the conditional probabilities of the fill variable given the x variable. 
+
+There is not necessarily an absolute superior graph to use. The preferred graph to use depends on whether we are examining marginal distributions, joint distributions, or conditional distributions. 
+
+
+**k**
+
+```{r}
+ggplot(titanic, aes(x = Age_category)) + geom_bar(aes(y = (..count..)/sum(..count..))) + labs(title = "Passengers by Age Category") + xlab("Age Category") + ylab("Proportion of Total Passengers")
+```
+
+**l**
+```{r}
+ggplot(titanic, aes(x = Age_category)) + geom_bar(aes(y =  (100*..count..)/sum(..count..))) + labs(title = "Passengers by Age Category") + xlab("Age Category") + ylab("Percentage of Passengers")
+```
+
+This was a long problem, but the goal was to show you that `ggplot()` is extremely flexible, and that there are many ways of visualizing the same variables!  We'll spend a lot of time over the next few weeks talking about which ways are best in which cases.
+
+***
+***
+
+
+
+## Homework Problem 4
+
+(3 points each)
+
+**Reordering Categories and Bars**
+
+**a**
+
+```{r}
+set.seed(1)
+  titanic <- titanic %>% mutate(Age_category2=
+                            fct_shuffle(Age_category)
+ )
+ 
+ggplot(titanic, aes(x = Age_category2, fill = Survived)) + geom_bar(position = "dodge") + labs(title = "Age Category and Survival") + xlab("Age Category") + ylab("Number of Passengers")
+```
+
+
+
+
+
+**b**
+The function fct_recode() can be used to rename categories. The function fct_inorder() can be used to reorder the categories in the order of first appearance in the dataset. fct_infreq() orders the categories according to their frequency. A combination of fct_infreq() and fct_rev() reverses the order of levels.
+
+**c**
+```{r}
+ggplot(titanic, aes(x = fct_infreq(factor(Age_category2)), fill = Survived)) +  geom_bar(position = "dodge") + labs(title = "Age Category and Survival") + xlab("Age Category") + ylab("Number of Passengers")
+
+```
+
+d. Recreate the plot in part (b), but this time, order the categories from least frequent to most frequent.
+
+```{r}
+ggplot(titanic, aes(x = fct_rev(fct_infreq(factor(Age_category2))), fill = Survived)) +  geom_bar(position = "dodge") + labs(title = "Age Category and Survival") + xlab("Age Category") + ylab("Number of Passengers")
+
+
+```
+
+
+e. Recreate the plot in part (b), but this time, order the categories in a logical order using `forcats`.
+
+```{r}
+ggplot(titanic, aes(x = Age_category2, fill = Survived)) +  geom_bar(position = "dodge") + labs(title = "Age Category and Survival") + xlab("Age Category") + ylab("Number of Passengers")
+
+```
+
+f.  Recreate the plot from the previous part (Problem 5, part (e)), but this time, rename the categories so that they use the following day abbreviations:  "CI","T","YA","A","E".
+
+```{r}
+titanic <- mutate(titanic,
+   Age_category2 = cut(Age,breaks = c(0, 12, 18, 25, 60, 100)),
+     Age_category2 = fct_recode(Age_category2,
+     "E" = "(60,100]",
+     "A" = "(25,60]",
+    "CI" = "(0,12]",
+     "T" = "(12,18]",
+    "YA" ="(18,25]" 
+    )
+ )
+
+ggplot(titanic, aes(x = Age_category2, fill = Survived)) +  geom_bar(position = "dodge") + labs(title = "Age Category and Survival") + xlab("Age Category") + ylab("Number of Passengers")
+```
+
+
+**g**
+The viewer might think that the order of the categorical variables are in logical order and draw incorrect conclusions about the relationship between age category and number that survived. Similarly, if the x-axis was organized by frequency, then there still might not be a logical order for the x-axis. This might also be misleading as the viewer might think that the graph is in logical order.
+
+***
+***
+

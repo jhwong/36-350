@@ -9,19 +9,6 @@ output:
     code_folding:  show
 ---
 
-***General instructions for all assignments***: 
-
-
-***
-***
-
-***Purpose of Today's Assignment***
-
-
-
-
-
-# Oral Evaluation Graphic
 
 
 
